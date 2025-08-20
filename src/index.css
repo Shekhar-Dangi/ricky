@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+/* Custom animations */
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slide-in-delay {
+  0% {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  50% {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes slide-in-delay-2 {
+  0% {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  66% {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.7s ease-out forwards;
+}
+
+.animate-slide-in-delay {
+  animation: slide-in-delay 1s ease-out forwards;
+}
+
+.animate-slide-in-delay-2 {
+  animation: slide-in-delay-2 1.2s ease-out forwards;
+}
+
+/* Custom scrollbar for chat */
+.chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.chat-scroll::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.chat-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Line clamp utility */
+.line-clamp-1 {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+}
+
+/* Font smoothing */
+body {
+  font-family: Inter, 'SF Pro Text', 'SF Pro Display', ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, 'Helvetica Neue', Arial, 'Apple Color Emoji', 'Segoe UI Emoji';
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
