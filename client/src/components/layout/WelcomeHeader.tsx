@@ -37,7 +37,7 @@ export function WelcomeHeader({ onStartChat }: WelcomeHeaderProps) {
       {/* Main header */}
       <div className="max-w-5xl mx-auto flex flex-col items-center">
         <h1 className="text-3xl sm:text-4xl md:text-5xl tracking-tight text-center text-slate-100 font-medium">
-          Your AI companion for everything
+          Local Custom Personal Assistant
         </h1>
         <p className="mt-3 text-slate-400 text-sm md:text-base text-center max-w-2xl">
           Chat naturally, manage your memory, analyze files, and execute
