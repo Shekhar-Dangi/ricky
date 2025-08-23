@@ -1,12 +1,47 @@
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { ChevronRight, FolderOpen, Code2, Database, Plug } from "lucide-react";
+import { ChevronRight, ChevronDown, Cpu, Cloud, HardDrive } from "lucide-react";
+
+interface Model {
+  name: string;
+  provider: string;
+  type: string;
+  description: string;
+  supports_streaming: boolean;
+  supports_tools: boolean;
+  status: string;
+}
 
 interface RightPanelProps {
   isVisible: boolean;
+  availableModels: Model[];
+  selectedModel: string;
+  onModelSelect: (model: string) => void;
 }
 
-export function RightPanel({ isVisible }: RightPanelProps) {
+export function RightPanel({
+  isVisible,
+  availableModels,
+  selectedModel,
+  onModelSelect,
+}: RightPanelProps) {
+  const getModelIcon = (type: string, provider: string) => {
+    if (type === "local") {
+      return <HardDrive size={14} className="text-slate-300" />;
+    } else if (provider === "gemini") {
+      return <Cloud size={14} className="text-slate-300" />;
+    }
+    return <Cpu size={14} className="text-slate-300" />;
+  };
+
+  const getModelDisplayName = (name: string) => {
+    if (name === "gemini-2.5-flash") {
+      return "Gemini 2.5 Flash";
+    } else if (name === "gemini-2.5-pro") {
+      return "Gemini 2.5 Pro";
+    }
+    return name;
+  };
   return (
     <div
       className={`fixed z-20 right-4 top-4 bottom-4 pointer-events-none transition-all duration-500 ${
@@ -88,7 +123,7 @@ export function RightPanel({ isVisible }: RightPanelProps) {
           </div>
         </Card>
 
-        {/* Quick Actions */}
+        {/* Model Selection */}
         <Card
           className={`pointer-events-auto w-[19rem] max-w-[85vw] p-4 transition-all duration-700 delay-300 ease-[cubic-bezier(0.175,0.885,0.32,1.275)] ${
             isVisible
@@ -97,67 +132,43 @@ export function RightPanel({ isVisible }: RightPanelProps) {
           }`}
         >
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm tracking-tight text-slate-100">
-              Quick Actions
-            </h3>
+            <h3 className="text-sm tracking-tight text-slate-100">LLM</h3>
+            <div className="text-xs text-slate-400">
+              {availableModels.length} available
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="ghost"
-              className="flex-col gap-1 h-auto p-3 text-left"
-            >
-              <div className="flex items-center gap-2 self-start">
-                <FolderOpen size={14} className="text-slate-300" />
-                <span className="text-xs tracking-tight text-slate-200">
-                  Analyze Files
-                </span>
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {availableModels.map((model) => (
+              <Button
+                key={model.name}
+                variant={selectedModel === model.name ? "secondary" : "ghost"}
+                className="w-full justify-start p-3 h-auto"
+                onClick={() => {
+                  onModelSelect(model.name);
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  {getModelIcon(model.type, model.provider)}
+                  <div className="text-left">
+                    <div className="text-xs tracking-tight text-slate-200">
+                      {getModelDisplayName(model.name)}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {model.type === "local" ? "Local" : "Online"} •{" "}
+                      {model.provider}
+                    </div>
+                  </div>
+                </div>
+                {selectedModel === model.name && (
+                  <div className="w-2 h-2 rounded-full bg-green-400"></div>
+                )}
+              </Button>
+            ))}
+            {availableModels.length === 0 && (
+              <div className="text-xs text-slate-400 text-center py-4">
+                No models available
               </div>
-              <div className="text-[10px] text-slate-400 self-start">
-                Vector search
-              </div>
-            </Button>
-            <Button
-              variant="ghost"
-              className="flex-col gap-1 h-auto p-3 text-left"
-            >
-              <div className="flex items-center gap-2 self-start">
-                <Code2 size={14} className="text-slate-300" />
-                <span className="text-xs tracking-tight text-slate-200">
-                  Execute Code
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-400 self-start">
-                Sandboxed
-              </div>
-            </Button>
-            <Button
-              variant="ghost"
-              className="flex-col gap-1 h-auto p-3 text-left"
-            >
-              <div className="flex items-center gap-2 self-start">
-                <Database size={14} className="text-slate-300" />
-                <span className="text-xs tracking-tight text-slate-200">
-                  Query Memory
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-400 self-start">
-                Semantic search
-              </div>
-            </Button>
-            <Button
-              variant="ghost"
-              className="flex-col gap-1 h-auto p-3 text-left"
-            >
-              <div className="flex items-center gap-2 self-start">
-                <Plug size={14} className="text-slate-300" />
-                <span className="text-xs tracking-tight text-slate-200">
-                  Run Plugin
-                </span>
-              </div>
-              <div className="text-[10px] text-slate-400 self-start">
-                Integrations
-              </div>
-            </Button>
+            )}
           </div>
         </Card>
       </div>

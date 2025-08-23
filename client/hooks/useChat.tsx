@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { formatApiError } from "../src/utils/api";
 
 interface Message {
@@ -10,12 +10,44 @@ interface Message {
   isStreaming?: boolean;
 }
 
+interface Model {
+  name: string;
+  provider: string;
+  type: string;
+  description: string;
+  supports_streaming: boolean;
+  supports_tools: boolean;
+  status: string;
+}
+
 const BACKEND_URL = "http://127.0.0.1:8000";
 
 export function useChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [availableModels, setAvailableModels] = useState<Model[]>([]);
+  const [selectedModel, setSelectedModel] = useState<string>("");
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Fetch available models on mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const response = await fetch(`${BACKEND_URL}/api/v1/chat/models`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableModels(data.models || []);
+          if (!selectedModel && data.default) {
+            setSelectedModel(data.default);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to fetch models:", error);
+      }
+    };
+
+    fetchModels();
+  }, []);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -61,7 +93,7 @@ export function useChat() {
         const requestData = {
           message: content,
           history: historyMessages,
-          model: "mistral:7b",
+          model: selectedModel,
           temperature: 0.7,
           stream: true,
         };
@@ -97,7 +129,6 @@ export function useChat() {
 
             // Decode chunk and process each line
             const chunk = decoder.decode(value, { stream: true });
-            console.log("Raw chunk received:", chunk);
             const lines = chunk.split("\n");
 
             for (const line of lines) {
@@ -106,15 +137,12 @@ export function useChat() {
               // Skip empty lines
               if (!trimmedLine) continue;
 
-              console.log("Processing line:", trimmedLine);
-
               // Parse Server-Sent Events format
               if (trimmedLine.startsWith("data: ")) {
                 const dataStr = trimmedLine.slice(6); // Remove 'data: ' prefix
 
                 try {
                   const data = JSON.parse(dataStr);
-                  console.log("Parsed data:", data);
 
                   // Check for errors
                   if (data.error) {
@@ -123,7 +151,6 @@ export function useChat() {
 
                   // Check if stream is complete
                   if (data.done) {
-                    console.log("Stream completed");
                     // Mark streaming as complete and add suggestions
                     setMessages((prev) =>
                       prev.map((msg) =>
@@ -147,12 +174,6 @@ export function useChat() {
                   // Update message with new chunk
                   if (data.chunk) {
                     accumulatedContent += data.chunk;
-                    console.log(
-                      "🔄 Adding chunk:",
-                      JSON.stringify(data.chunk),
-                      "Total length:",
-                      accumulatedContent.length
-                    );
 
                     setMessages((prev) =>
                       prev.map((msg) =>
@@ -203,7 +224,7 @@ export function useChat() {
         abortControllerRef.current = null;
       }
     },
-    [messages]
+    [messages, selectedModel]
   );
 
   const clearChat = useCallback(() => {
@@ -232,6 +253,9 @@ export function useChat() {
   return {
     messages,
     isLoading,
+    availableModels,
+    selectedModel,
+    setSelectedModel,
     sendMessage,
     clearChat,
     stopGeneration,

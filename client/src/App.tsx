@@ -5,11 +5,15 @@ import { RightPanel } from "./components/layout/RightPanel";
 import { WelcomeHeader } from "./components/layout/WelcomeHeader";
 import { ChatPanel } from "./components/chat/ChatPanel";
 import { ChevronLeft } from "lucide-react";
+import { useChat } from "../hooks/useChat";
 
 function App() {
   const [activeModule, setActiveModule] = useState("chat");
   const [isChatVisible, setIsChatVisible] = useState(false);
   const [isRightPanelVisible, setIsRightPanelVisible] = useState(false);
+
+  // Get chat state for model management
+  const chatState = useChat();
 
   const handleStartChat = () => {
     setIsChatVisible(true);
@@ -37,7 +41,12 @@ function App() {
         onModuleChange={handleModuleChange}
       />
 
-      <RightPanel isVisible={isRightPanelVisible} />
+      <RightPanel
+        isVisible={isRightPanelVisible}
+        availableModels={chatState.availableModels}
+        selectedModel={chatState.selectedModel}
+        onModelSelect={chatState.setSelectedModel}
+      />
 
       {/* Right Panel Toggle Button */}
       <button
@@ -67,7 +76,14 @@ function App() {
           <WelcomeHeader onStartChat={handleStartChat} />
 
           <div className="flex justify-center">
-            <ChatPanel isVisible={isChatVisible} />
+            <ChatPanel
+              isVisible={isChatVisible}
+              messages={chatState.messages}
+              isLoading={chatState.isLoading}
+              sendMessage={chatState.sendMessage}
+              clearChat={chatState.clearChat}
+              stopGeneration={chatState.stopGeneration}
+            />
           </div>
 
           {/* Helper tips */}

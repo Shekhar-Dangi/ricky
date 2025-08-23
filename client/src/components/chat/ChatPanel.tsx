@@ -5,16 +5,35 @@ import { ChatMessage } from "./ChatMessage";
 import { ChatInput } from "./ChatInput";
 import { useChat } from "../../../hooks/useChat";
 
+interface Message {
+  id: string;
+  type: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+  suggestions?: string[];
+  isStreaming?: boolean;
+}
+
 interface ChatPanelProps {
   isVisible: boolean;
   onClose?: () => void;
+  messages: Message[];
+  isLoading: boolean;
+  sendMessage: (content: string) => Promise<void>;
+  clearChat: () => void;
+  stopGeneration: () => void;
 }
 
-export function ChatPanel({ isVisible }: ChatPanelProps) {
-  const { messages, isLoading, sendMessage, clearChat, stopGeneration } =
-    useChat();
+export function ChatPanel({
+  isVisible,
+  messages,
+  isLoading,
+  sendMessage,
+  clearChat,
+  stopGeneration,
+}: ChatPanelProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
+  const { selectedModel, setSelectedModel } = useChat();
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -37,6 +56,12 @@ export function ChatPanel({ isVisible }: ChatPanelProps) {
   }, [isVisible, messages.length]);
 
   const handleSendMessage = async (content: string) => {
+    console.log(selectedModel);
+    if (selectedModel.length == 0) {
+      setSelectedModel(() => {
+        return "mistral:77b";
+      });
+    }
     await sendMessage(content);
   };
 
