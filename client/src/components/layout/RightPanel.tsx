@@ -1,6 +1,6 @@
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { ChevronRight, ChevronDown, Cpu, Cloud, HardDrive } from "lucide-react";
+import { ChevronRight, ChevronDown, Cpu, Cloud, HardDrive, FileText } from "lucide-react";
 
 interface Model {
   name: string;
@@ -12,11 +12,23 @@ interface Model {
   status: string;
 }
 
+interface KnowledgeSource {
+  id: string;
+  name: string;
+  path: string;
+  type: "file" | "folder";
+  chunkCount: number;
+  status: "processing" | "ready" | "error";
+  lastUpdated: string;
+}
+
 interface RightPanelProps {
   isVisible: boolean;
   availableModels: Model[];
   selectedModel: string;
   onModelSelect: (model: string) => void;
+  knowledgeSources?: KnowledgeSource[];
+  onAddReference?: () => void;
 }
 
 export function RightPanel({
@@ -24,6 +36,8 @@ export function RightPanel({
   availableModels,
   selectedModel,
   onModelSelect,
+  knowledgeSources = [],
+  onAddReference,
 }: RightPanelProps) {
   const getModelIcon = (type: string, provider: string) => {
     if (type === "local") {
@@ -101,25 +115,92 @@ export function RightPanel({
             <h3 className="text-sm tracking-tight text-slate-100">
               Knowledge Base
             </h3>
-            <Button size="sm" variant="secondary">
-              Index
+            <Button 
+              size="sm" 
+              variant="secondary"
+              onClick={onAddReference}
+            >
+              Add Reference
             </Button>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-400/30 to-sky-500/20 border border-white/10"></div>
-                <div>
-                  <div className="text-xs tracking-tight text-slate-100">
-                    /docs/codebase
+          <div className="space-y-2 max-h-32 overflow-y-auto">
+            {knowledgeSources.length > 0 ? (
+              knowledgeSources.map((source) => (
+                <div key={source.id} className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-400/30 to-sky-500/20 border border-white/10 flex items-center justify-center">
+                      <FileText size={12} className="text-cyan-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs tracking-tight text-slate-100 truncate">
+                        {source.name}
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        {source.chunkCount} chunks • {source.lastUpdated}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] text-slate-400">156 chunks</div>
+                  <div className="flex items-center gap-1">
+                    <div className={`w-2 h-2 rounded-full ${
+                      source.status === "ready" ? "bg-green-400" : 
+                      source.status === "processing" ? "bg-yellow-400" : "bg-red-400"
+                    }`}></div>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <>
+                {/* Example/Demo sources when no real sources exist */}
+                <div className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-400/30 to-sky-500/20 border border-white/10 flex items-center justify-center">
+                      <FileText size={12} className="text-cyan-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs tracking-tight text-slate-100 truncate">
+                        /docs/codebase
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        156 chunks • Updated 2h ago
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                      <ChevronDown size={12} />
+                    </Button>
+                  </div>
+                </div>
+                
+                <div className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-400/30 to-pink-500/20 border border-white/10 flex items-center justify-center">
+                      <FileText size={12} className="text-purple-300" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs tracking-tight text-slate-100 truncate">
+                        /src/components
+                      </div>
+                      <div className="text-[10px] text-slate-400">
+                        89 chunks • Processing...
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
+                      <ChevronDown size={12} />
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+            
+            {/* Empty state when no references */}
+            {knowledgeSources.length === 0 && (
+              <div className="text-xs text-slate-400 text-center py-4 hidden">
+                No references added yet
               </div>
-              <Button size="sm" variant="secondary">
-                Update
-              </Button>
-            </div>
+            )}
           </div>
         </Card>
 

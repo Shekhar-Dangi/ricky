@@ -98,44 +98,6 @@ async def chat_stream(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/complete", response_model=ChatResponse)
-async def chat_complete(request: ChatRequest):
-    """
-    Get complete (non-streaming) chat response with orchestration support.
-    
-    This endpoint returns the full response at once, useful for
-    cases where streaming is not needed.
-    """
-    try:
-        # Convert history to the format expected by orchestrator
-        history = []
-        for msg in request.history:
-            history.append({
-                "role": msg.role,
-                "content": msg.content
-            })
-        
-        logger.info(f"Getting complete orchestrated response for model: {request.model}")
-        
-        # Create orchestrator
-        orchestrator = await create_orchestrator(model=request.model)
-        
-        # Collect all chunks into a complete response
-        complete_response = ""
-        async for chunk in orchestrator.process_message(request.message, history):
-            complete_response += chunk
-        
-        return ChatResponse(
-            response=complete_response,
-            model=request.model,
-            total_tokens=0  # Ollama doesn't provide token counts yet
-        )
-        
-    except Exception as e:
-        logger.error(f"Error in chat_complete endpoint: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.get("/models")
 async def get_models():
     """
