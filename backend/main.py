@@ -2,9 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
+from pathlib import Path
 
 from api.routes import chat
+from api.routes import knowledge
 from services.ollama_service import OllamaService
+from database.connection import create_db_and_tables
 
 
 # Configure logging
@@ -17,21 +20,33 @@ async def lifespan(app: FastAPI):
     """App lifespan manager for startup and shutdown events."""
     logger.info("Starting Ricky Backend...")
     
-    # Test Ollama connection on startup
+    try:
+        logger.info("Initializing databases...")
+        
+        create_db_and_tables()
+        logger.info("SQLite database initialized")
+        
+        chroma_dir = Path("./chroma_db")
+        chroma_dir.mkdir(exist_ok=True)
+        logger.info("ChromaDB directory initialized")
+        
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+
+    
     ollama_service = OllamaService()
     try:
-        # await ollama_service.test_connection()
-        logger.info("✅ Ollama connection successful")
+        await ollama_service.test_connection()
+        logger.info("Ollama connection successful")
     except Exception as e:
-        logger.error(f"❌ Ollama connection failed: {e}")
-        # Don't fail startup, but log the error
+        logger.error(f"Ollama connection failed: {e}")
     
+    logger.info("Ricky Backend startup complete!")
     yield
     
     logger.info("Shutting down Ricky Backend...")
 
 
-# Create FastAPI app with lifespan
 app = FastAPI(
     title="Ricky Backend",
     description="Personal Assistant Backend with Ollama Integration",
@@ -39,17 +54,16 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],  # Vite dev server
+    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"], 
     allow_credentials=True,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
-# Include routers
 app.include_router(chat.router, prefix="/api/v1")
+app.include_router(knowledge.router, prefix="/api/v1")
 
 
 @app.get("/")

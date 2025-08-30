@@ -66,6 +66,43 @@ class KnowledgeService:
         finally:
             session.close()
     
+    def process_existing_source(self, source_id: int):
+        """
+        Process an existing KnowledgeSource record with single session:
+        1. Get source from database
+        2. Process files (chunk + embed)
+        3. Update status
+        """
+        session = next(get_session())
+        try:
+            source = session.get(KnowledgeSource, source_id)
+            if not source:
+                raise ValueError(f"Source with ID {source_id} not found")
+            
+            source.status = ProcessingStatus.PROCESSING
+            session.commit()
+            
+            path_obj = Path(source.path)
+            self._process_path(path_obj, source_id, session)
+            
+            source.status = ProcessingStatus.COMPLETED
+            session.commit()
+            
+        except Exception as e:
+            session.rollback()
+            
+            try:
+                source = session.get(KnowledgeSource, source_id)
+                if source:
+                    source.status = ProcessingStatus.FAILED
+                    source.error_message = str(e)
+                    session.commit()
+            except:
+                pass 
+            raise
+        finally:
+            session.close()
+    
     def _process_path(self, path: Path, source_id: int, session):
         """Process a file or folder."""
         if path.is_file():
@@ -109,9 +146,11 @@ class KnowledgeService:
         
         content_hash = hashlib.sha256(content.encode()).hexdigest()
         
+        source = session.get(KnowledgeSource, source_id)
+        
         source_file = SourceFile(
             source_id=source_id,
-            file_path=str(file_path.relative_to(Path(session.get(KnowledgeSource, source_id).path).parent)),
+            file_path=str(file_path.relative_to(Path(source.path).parent)),
             file_name=file_path.name,
             file_extension=file_path.suffix,
             raw_content=content,
@@ -122,13 +161,29 @@ class KnowledgeService:
             is_processed=False
         )
         session.add(source_file)
-        session.commit()
+        session.flush() 
         
         chunks = self._create_chunks(content)
+        
+        if not chunks:
+            print(f"Skipping {file_path.name} - no valid chunks generated (file too small or empty)")
+            source_file.is_processed = True
+            source_file.chunk_count = 0
+            source_file.processed_at = datetime.now()
+            session.commit()
+            return
         
         chunk_texts = [chunk['text'] for chunk in chunks]
         embeddings = self.embedding_model.encode(chunk_texts).tolist()
         
+        if not embeddings or len(embeddings) == 0:
+            print(f"Skipping {file_path.name} - no embeddings generated")
+            source_file.is_processed = True
+            source_file.chunk_count = 0
+            source_file.processed_at = datetime.now()
+            session.commit()
+            return
+
         collection_name = f"source_{source_id}"
         self._store_in_chroma(chunks, embeddings, collection_name, source_file.id)
         
@@ -149,12 +204,11 @@ class KnowledgeService:
         source_file.chunk_count = len(chunks)
         source_file.processed_at = datetime.now()
         
-        source = session.get(KnowledgeSource, source_id)
         source.processed_chunks += len(chunks)
         source.total_chunks += len(chunks)
         
         session.commit()
-        print(f"✅ Processed {len(chunks)} chunks from {file_path.name}")
+        print(f"Processed {len(chunks)} chunks from {file_path.name}")
     
     def _create_chunks(self, text: str, window_size: int = 512, overlap: int = 128) -> List[Dict]:
         """Create overlapping text chunks."""
@@ -181,6 +235,15 @@ class KnowledgeService:
     def _store_in_chroma(self, chunks: List[Dict], embeddings: List[List[float]], 
                         collection_name: str, file_id: int):
         """Store chunks and embeddings in ChromaDB."""
+        # Guard against empty chunks or embeddings
+        if not chunks or not embeddings or len(chunks) == 0 or len(embeddings) == 0:
+            print(f"Skipping ChromaDB storage - empty chunks or embeddings")
+            return
+        
+        if len(chunks) != len(embeddings):
+            print(f"Mismatch: {len(chunks)} chunks vs {len(embeddings)} embeddings")
+            return
+        
         try:
             collection = self.chroma_client.get_or_create_collection(collection_name)
         except:
@@ -207,7 +270,7 @@ class KnowledgeService:
             metadatas=metadatas
         )
         
-        print(f"✅ Stored {len(chunks)} chunks in ChromaDB collection: {collection_name}")
+        print(f"Stored {len(chunks)} chunks in ChromaDB collection: {collection_name}")
     
     def search_similar(self, query: str, source_id: Optional[int] = None, 
                       n_results: int = 5) -> List[Dict]:
