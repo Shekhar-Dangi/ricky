@@ -73,6 +73,26 @@ def get_system_prompt() -> str:
     return RICKY_SYSTEM_PROMPT
 
 
+def get_rag_enhanced_system_prompt(knowledge_context: str) -> str:
+    """Get RAG-enhanced system prompt with knowledge context."""
+    enhanced_prompt = f"""{RICKY_SYSTEM_PROMPT}
+
+## KNOWLEDGE CONTEXT:
+You have access to relevant information from the user's knowledge base. Use this context to provide more accurate and personalized responses:
+
+{knowledge_context}
+
+**IMPORTANT KNOWLEDGE USAGE RULES:**
+- When answering questions, prioritize information from the knowledge context if it's relevant
+- Naturally incorporate knowledge without explicitly mentioning "according to your documents" 
+- If knowledge context contradicts common knowledge, trust the user's knowledge base
+- If the knowledge context doesn't contain relevant information, answer normally with your general knowledge
+- Never make up or hallucinate information not present in the knowledge context
+- When using knowledge context, be confident and authoritative about the information
+"""
+    return enhanced_prompt
+
+
 def get_tool_schemas() -> dict:
     """Get the tool schemas available to the LLM."""
     return {

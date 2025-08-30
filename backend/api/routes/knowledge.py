@@ -14,6 +14,29 @@ router = APIRouter(prefix="/resource", tags=["knowledge"])
 class IngestRequest(BaseModel):
     path: str
 
+class SearchRequest(BaseModel):
+    query: str
+    limit: Optional[int] = 10
+    threshold: Optional[float] = 0.7
+    source_id: Optional[int] = None
+
+class SearchResult(BaseModel):
+    chunk_text: str
+    similarity_score: float
+    source_id: Optional[int]
+    source_name: str
+    source_path: str
+    source_type: str
+    file_id: Optional[int]
+    file_name: str
+    file_path: str
+    file_extension: str
+    chunk_index: Optional[int]
+    start_char: Optional[int]
+    end_char: Optional[int]
+    chroma_id: str
+    query: str
+
 class KnowledgeSourceResponse(BaseModel):
     id: int
     name: str
@@ -115,6 +138,94 @@ def ingest_resource(
         "message": f"Started processing {request.path}",
         "status": "pending"
     }
+
+@router.post("/search", response_model=List[SearchResult])
+def search_knowledge(
+    request: SearchRequest,
+    session: Session = Depends(get_session)
+):
+    """
+    Search for similar content in the knowledge base.
+    
+    Args:
+        request: Search parameters (query, limit, threshold, optional source_id)
+        
+    Returns:
+        List of matching chunks with similarity scores and metadata
+    """
+    if not request.query.strip():
+        raise HTTPException(status_code=400, detail="Query cannot be empty")
+    
+    try:
+        service = KnowledgeService()
+        
+        # Use the enhanced search method
+        results = service.search_knowledge(
+            query=request.query,
+            limit=request.limit,
+            threshold=request.threshold
+        )
+        
+        if not results:
+            return []
+        
+        # Convert to response model
+        search_results = []
+        for result in results:
+            search_result = SearchResult(
+                chunk_text=result['chunk_text'],
+                similarity_score=result['similarity_score'],
+                source_id=result['source_id'],
+                source_name=result['source_name'],
+                source_path=result['source_path'],
+                source_type=result['source_type'],
+                file_id=result['file_id'],
+                file_name=result['file_name'],
+                file_path=result['file_path'],
+                file_extension=result['file_extension'],
+                chunk_index=result['chunk_index'],
+                start_char=result['start_char'],
+                end_char=result['end_char'],
+                chroma_id=result['chroma_id'],
+                query=result['query']
+            )
+            search_results.append(search_result)
+        
+        return search_results
+        
+    except Exception as e:
+        print(f"❌ Error searching knowledge: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error searching knowledge base: {str(e)}"
+        )
+
+@router.get("/search")
+def search_knowledge_get(
+    query: str,
+    limit: int = 10,
+    threshold: float = 0.7,
+    source_id: Optional[int] = None,
+    session: Session = Depends(get_session)
+):
+    """
+    Search for similar content in the knowledge base (GET version).
+    
+    Query parameters:
+        query: Search query text
+        limit: Maximum number of results (default: 10)
+        threshold: Minimum similarity threshold 0-1 (default: 0.7)
+        source_id: Optional source ID to limit search scope
+    """
+    # Convert to SearchRequest and use POST endpoint logic
+    request = SearchRequest(
+        query=query,
+        limit=limit,
+        threshold=threshold,
+        source_id=source_id
+    )
+    
+    return search_knowledge(request, session)
 
 @router.get("/list", response_model=List[KnowledgeSourceResponse])
 def list_resources(session: Session = Depends(get_session)):

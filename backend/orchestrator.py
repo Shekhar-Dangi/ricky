@@ -8,7 +8,7 @@ import logging
 from typing import Dict, Any, List, Optional, AsyncGenerator, Tuple
 import asyncio
 from tools.api import execute_tool
-from prompts.system_prompt import get_system_prompt
+from prompts.system_prompt import get_system_prompt, get_rag_enhanced_system_prompt
 from services.model_manager import get_model_manager
 
 logger = logging.getLogger(__name__)
@@ -25,6 +25,14 @@ class RickyOrchestrator:
         self.model = model
         self.model_provider = None
         self.system_prompt = get_system_prompt()
+        self.knowledge_service = None
+        
+    async def _get_knowledge_service(self):
+        """Get or initialize the knowledge service."""
+        if self.knowledge_service is None:
+            from services.knowledge_service import KnowledgeService
+            self.knowledge_service = KnowledgeService()
+        return self.knowledge_service
         
     async def _get_provider(self):
         """Get or initialize the model provider."""
@@ -203,18 +211,25 @@ class RickyOrchestrator:
         logger.info(f"✅ Tool call validated: {action}")
         return True
     
-    def _build_messages(self, user_message: str, history: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def _build_messages(self, user_message: str, history: List[Dict[str, str]], knowledge_context: Optional[str] = None) -> List[Dict[str, str]]:
         """
         Build message list for LLM including system prompt and history.
         
         Args:
             user_message: Current user message
             history: Previous conversation history
+            knowledge_context: Optional knowledge context from RAG
             
         Returns:
             List of messages in chat format
         """
-        messages = [{"role": "system", "content": self.system_prompt}]
+        # Use RAG-enhanced system prompt if knowledge context is available
+        if knowledge_context:
+            system_prompt = get_rag_enhanced_system_prompt(knowledge_context)
+        else:
+            system_prompt = get_system_prompt()
+            
+        messages = [{"role": "system", "content": system_prompt}]
         
         # Add conversation history
         for msg in history:
@@ -223,7 +238,7 @@ class RickyOrchestrator:
         
         # Add current user message
         messages.append({"role": "user", "content": user_message})
-        
+        print("MESSAGE : ", messages)
         return messages
     
     async def _execute_tool_call(self, tool_call: Dict[str, Any]) -> Dict[str, Any]:
@@ -258,7 +273,9 @@ class RickyOrchestrator:
         user_message: str, 
         history: List[Dict[str, str]], 
         tool_call: Optional[Dict[str, Any]] = None, 
-        tool_result: Optional[Dict[str, Any]] = None
+        tool_result: Optional[Dict[str, Any]] = None,
+        knowledge_sources: Optional[List[Dict[str, Any]]] = None,
+        knowledge_context: Optional[str] = None
     ) -> AsyncGenerator[str, None]:
         """
         Generate final response incorporating tool results or handling no-tool responses.
@@ -268,6 +285,8 @@ class RickyOrchestrator:
             history: Conversation history
             tool_call: The tool call that was executed (if any)
             tool_result: Results from tool execution (if any)
+            knowledge_sources: Knowledge sources used for context (if any)
+            knowledge_context: Knowledge context string for RAG
             
         Yields:
             Response chunks
@@ -286,17 +305,63 @@ class RickyOrchestrator:
             # No tool needed - create context for direct response
             tool_context = f"This wasn't a tool call. Question: {user_message} \n\n IMPORTANT : Do not include the result of tool call in the final response."
         
-        # Create messages for the final response
+        # Use RAG-enhanced system prompt if knowledge context is available
+        if knowledge_context:
+            system_prompt = get_rag_enhanced_system_prompt(knowledge_context)
+        else:
+            system_prompt = get_system_prompt()
+        
+        # Create messages for the final response with proper knowledge context
         messages = [
-            {"role": "system", "content": get_system_prompt()},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": tool_context}
         ]
         
         # Get provider and stream the final response
         provider = await self._get_provider()
+        
+        # If knowledge sources were used, we might want to add source citations at the end
+        response_chunks = []
         async for chunk in provider.generate_stream(messages):
+            response_chunks.append(chunk)
             yield chunk
             await asyncio.sleep(0)
+        
+        # Add source citations if knowledge was used (optional enhancement)
+        if knowledge_sources and len(knowledge_sources) > 0:
+            full_response = ''.join(response_chunks)
+            # Only add citations if the response seems to use the knowledge
+            if len(full_response.strip()) > 50:  # Basic check for substantial response
+                citations = self._format_knowledge_citations(knowledge_sources)
+                if citations:
+                    yield f"\n\n{citations}"
+    
+    def _format_knowledge_citations(self, knowledge_sources: List[Dict[str, Any]]) -> str:
+        """
+        Format knowledge sources into citation text.
+        
+        Args:
+            knowledge_sources: List of knowledge source metadata
+            
+        Returns:
+            Formatted citation string
+        """
+        if not knowledge_sources:
+            return ""
+        
+        # Group sources by source name to avoid duplicates
+        unique_sources = {}
+        for source in knowledge_sources:
+            source_key = f"{source['source_name']}"
+            if source_key not in unique_sources:
+                unique_sources[source_key] = source
+        
+        if len(unique_sources) == 1:
+            source = list(unique_sources.values())[0]
+            return f"*Source: {source['file_name']} from {source['source_name']}*"
+        else:
+            source_list = [f"{s['file_name']} from {s['source_name']}" for s in unique_sources.values()]
+            return f"*Sources: {', '.join(source_list)}*"
 
     
     async def process_message(
@@ -305,13 +370,14 @@ class RickyOrchestrator:
         history: List[Dict[str, str]]
     ) -> AsyncGenerator[str, None]:
         """
-        Process a user message through the orchestration pipeline.
+        Process a user message through the orchestration pipeline with RAG support.
         
         This is the main entry point that:
-        1. Gets initial LLM response
-        2. Detects if it's a tool call
-        3. Executes tools if needed
-        4. Generates final response
+        1. Searches knowledge base for relevant context
+        2. Gets initial LLM response with knowledge context
+        3. Detects if it's a tool call
+        4. Executes tools if needed
+        5. Generates final response
         
         Args:
             user_message: The user's message
@@ -320,10 +386,28 @@ class RickyOrchestrator:
         Yields:
             Response chunks (streaming)
         """
-        logger.info(f"🎭 Processing message: {user_message[:100]}...")
+        logger.info(f"🎭 Processing message with RAG: {user_message[:100]}...")
         
-        # Build messages for initial LLM call
-        messages = self._build_messages(user_message, history)
+        # Step 1: Search knowledge base for relevant context
+        knowledge_context = None
+        knowledge_sources = []
+        
+        try:
+            knowledge_service = await self._get_knowledge_service()
+            rag_result = knowledge_service.search_for_chat_context(user_message)
+            
+            if rag_result['has_knowledge']:
+                knowledge_context = rag_result['context']
+                knowledge_sources = rag_result['sources']
+                logger.info(f"🧠 Found {rag_result['chunk_count']} relevant knowledge chunks (avg similarity: {rag_result.get('avg_similarity', 0):.3f})")
+            else:
+                logger.info("🧠 No relevant knowledge found, proceeding with general knowledge")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Knowledge search failed: {e}, proceeding without RAG")
+        
+        # Step 2: Build messages with knowledge context for initial LLM call
+        messages = self._build_messages(user_message, history, knowledge_context)
         
         # Get provider and initial response from LLM
         logger.info("🤖 Getting initial LLM response...")
@@ -356,7 +440,7 @@ class RickyOrchestrator:
                 logger.error(f"❌ Invalid tool call: {tool_call}")
                 # Treat as a no-tool response instead
                 async for chunk in self._generate_final_response(
-                    user_message, history
+                    user_message, history, None, None, knowledge_sources, knowledge_context
                 ):
                     yield chunk
                     await asyncio.sleep(0)
@@ -369,16 +453,16 @@ class RickyOrchestrator:
             # Generate final response with tool results
             logger.info("🎯 Generating final response with tool results...")
             async for chunk in self._generate_final_response(
-                user_message, history, tool_call, tool_result
+                user_message, history, tool_call, tool_result, knowledge_sources, knowledge_context
             ):
                 yield chunk
                 await asyncio.sleep(0)
                 
         elif self._is_no_tool_response(initial_response):
             logger.info("💬 No tool needed, generating direct response...")
-            # Generate response without tool execution
+            # Generate response without tool execution but with knowledge context
             async for chunk in self._generate_final_response(
-                user_message, history
+                user_message, history, None, None, knowledge_sources, knowledge_context
             ):
                 yield chunk
                 await asyncio.sleep(0)
@@ -386,7 +470,7 @@ class RickyOrchestrator:
             # Fallback: treat as direct response if we can't parse the JSON properly
             logger.info("🤷 Couldn't determine response type, treating as direct response...")
             async for chunk in self._generate_final_response(
-                user_message, history
+                user_message, history, None, None, knowledge_sources, knowledge_context
             ):
                 yield chunk
                 await asyncio.sleep(0)
