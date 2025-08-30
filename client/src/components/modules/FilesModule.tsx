@@ -1,100 +1,241 @@
 import { useState } from "react";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { FileText, Folder, Upload, Search, Download, Trash2, Eye, Filter } from "lucide-react";
-
-interface FileItem {
-  id: string;
-  name: string;
-  path: string;
-  type: "file" | "folder";
-  size: string;
-  modified: string;
-  status: "uploaded" | "processing" | "indexed";
-}
+import {
+  FileText,
+  Folder,
+  Upload,
+  Search,
+  Trash2,
+  Eye,
+  Filter,
+  RefreshCw,
+  AlertCircle,
+} from "lucide-react";
+import { useKnowledge } from "../../../hooks/useKnowledge";
+import {
+  formatFileSize,
+  formatTimeAgo,
+  getStatusInfo,
+  getFilenameFromPath,
+  isValidPath,
+} from "../../utils/knowledge";
 
 export function FilesModule() {
-  const [files, setFiles] = useState<FileItem[]>([
-    {
-      id: "1",
-      name: "README.md",
-      path: "/docs/README.md",
-      type: "file",
-      size: "12.5 KB",
-      modified: "2 hours ago",
-      status: "indexed"
-    },
-    {
-      id: "2",
-      name: "API Documentation",
-      path: "/docs/api",
-      type: "folder",
-      size: "2.1 MB",
-      modified: "1 day ago", 
-      status: "indexed"
-    },
-    {
-      id: "3",
-      name: "project-notes.txt",
-      path: "/notes/project-notes.txt",
-      type: "file",
-      size: "8.2 KB",
-      modified: "3 days ago",
-      status: "uploaded"
-    }
-  ]);
+  const {
+    sources,
+    isLoading,
+    isIngesting,
+    error,
+    ingestSource,
+    deleteSource,
+    refreshSources,
+    clearError,
+  } = useKnowledge();
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "file" | "folder">("all");
+  const [filterType, setFilterType] = useState<"all" | "file" | "folder">(
+    "all"
+  );
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [pathInput, setPathInput] = useState("");
+  const [nameInput, setNameInput] = useState("");
+  const [showUploadForm, setShowUploadForm] = useState(false);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "indexed": return "text-green-400";
-      case "processing": return "text-yellow-400";
-      case "uploaded": return "text-blue-400";
-      default: return "text-slate-400";
-    }
-  };
+  const getStatusBadge = (
+    status: string,
+    totalFiles?: number,
+    processedFiles?: number
+  ) => {
+    const statusInfo = getStatusInfo({
+      status: status as any,
+      total_files: totalFiles || 0,
+      processed_files: processedFiles || 0,
+    } as any);
 
-  const getStatusBadge = (status: string) => {
-    const color = getStatusColor(status);
     return (
-      <span className={`text-xs px-2 py-1 rounded-full bg-white/10 ${color}`}>
-        {status}
+      <span
+        className={`text-xs px-2 py-1 rounded-full ${statusInfo.bgColor} ${statusInfo.color}`}
+      >
+        {statusInfo.text}
       </span>
     );
   };
 
-  const filteredFiles = files.filter(file => {
-    const matchesSearch = file.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         file.path.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterType === "all" || file.type === filterType;
+  const filteredSources = sources.filter((source) => {
+    const matchesSearch =
+      source.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      source.path.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterType === "all" || source.type === filterType;
     return matchesSearch && matchesFilter;
   });
+
+  const handleIngest = async () => {
+    if (!isValidPath(pathInput)) {
+      return;
+    }
+
+    try {
+      clearError();
+      const displayName = nameInput.trim() || getFilenameFromPath(pathInput);
+      await ingestSource(pathInput, displayName);
+
+      // Reset form
+      setPathInput("");
+      setNameInput("");
+      setShowUploadForm(false);
+    } catch (error) {
+      // Error is handled by the hook
+    }
+  };
+
+  const handleDelete = async (sourceId: number) => {
+    if (
+      confirm(
+        "Are you sure you want to delete this knowledge source? This action cannot be undone."
+      )
+    ) {
+      try {
+        await deleteSource(sourceId);
+      } catch (error) {
+        // Error is handled by the hook
+      }
+    }
+  };
 
   return (
     <div className="flex-1 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-slate-100">Files</h1>
-          <p className="text-sm text-slate-400">Manage uploaded files and folders</p>
+          <h1 className="text-xl font-semibold text-slate-100">
+            Knowledge Base
+          </h1>
+          <p className="text-sm text-slate-400">
+            Manage uploaded files and folders for AI context
+          </p>
         </div>
-        <Button className="gap-2">
-          <Upload size={16} />
-          Upload Files
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            onClick={refreshSources}
+            disabled={isLoading}
+            className="gap-2"
+          >
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+            Refresh
+          </Button>
+          <Button
+            onClick={() => setShowUploadForm(true)}
+            disabled={isIngesting}
+            className="gap-2"
+          >
+            <Upload size={16} />
+            {isIngesting ? "Ingesting..." : "Add Source"}
+          </Button>
+        </div>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <Card className="p-4 border-red-500/30 bg-red-500/10">
+          <div className="flex items-center gap-3">
+            <AlertCircle size={16} className="text-red-400" />
+            <div className="flex-1">
+              <p className="text-red-400 text-sm">{error}</p>
+            </div>
+            <Button size="sm" variant="ghost" onClick={clearError}>
+              ×
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Upload Form */}
+      {showUploadForm && (
+        <Card className="p-6">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-slate-100">
+                Add Knowledge Source
+              </h3>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowUploadForm(false)}
+              >
+                ×
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  File or Folder Path *
+                </label>
+                <input
+                  type="text"
+                  placeholder="/path/to/file/or/folder"
+                  value={pathInput}
+                  onChange={(e) => setPathInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-2">
+                  Display Name (optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Custom name for this source"
+                  value={nameInput}
+                  onChange={(e) => setNameInput(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-slate-400">
+                Supported: .md, .txt, .pdf, .docx, .py, .js, .ts and more
+              </p>
+              <div className="flex items-center gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowUploadForm(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={() => {
+                    console.log("sup");
+
+                    handleIngest();
+                  }}
+                  disabled={!isValidPath(pathInput) || isIngesting}
+                  className="gap-2"
+                >
+                  <Upload size={16} />
+                  {isIngesting ? "Processing..." : "Add Source"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Search and Filters */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         <Card className="lg:col-span-2 p-4">
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" />
+            <Search
+              size={16}
+              className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400"
+            />
             <input
               type="text"
-              placeholder="Search files..."
+              placeholder="Search knowledge sources..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
@@ -105,9 +246,11 @@ export function FilesModule() {
         <Card className="p-4">
           <div className="flex items-center gap-2">
             <Filter size={16} className="text-slate-400" />
-            <select 
+            <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value as "all" | "file" | "folder")}
+              onChange={(e) =>
+                setFilterType(e.target.value as "all" | "file" | "folder")
+              }
               className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             >
               <option value="all">All Types</option>
@@ -119,55 +262,66 @@ export function FilesModule() {
 
         <Card className="p-4">
           <div className="space-y-1">
-            <div className="text-xs text-slate-400">Total Files</div>
-            <div className="text-lg font-semibold text-slate-100">{files.length}</div>
+            <div className="text-xs text-slate-400">Total Sources</div>
+            <div className="text-lg font-semibold text-slate-100">
+              {sources.length}
+            </div>
           </div>
         </Card>
       </div>
 
-      {/* Files List */}
+      {/* Sources List */}
       <Card className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-medium text-slate-100">Files & Folders</h2>
+          <h2 className="text-lg font-medium text-slate-100">
+            Knowledge Sources
+          </h2>
           <div className="text-sm text-slate-400">
-            {filteredFiles.length} of {files.length} items
+            {filteredSources.length} of {sources.length} sources
           </div>
         </div>
 
         <div className="space-y-2">
-          {filteredFiles.map((file) => (
+          {filteredSources.map((source) => (
             <div
-              key={file.id}
+              key={source.id}
               className={`p-4 rounded-lg border transition-all cursor-pointer ${
-                selectedFile === file.id
+                selectedFile === source.id.toString()
                   ? "bg-cyan-500/10 border-cyan-500/30"
                   : "bg-white/5 border-white/10 hover:bg-white/10"
               }`}
-              onClick={() => setSelectedFile(file.id)}
+              onClick={() => setSelectedFile(source.id.toString())}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-400/20 to-pink-500/20 border border-white/10 flex items-center justify-center">
-                    {file.type === "folder" ? (
+                    {source.type === "folder" ? (
                       <Folder size={16} className="text-purple-300" />
                     ) : (
                       <FileText size={16} className="text-purple-300" />
                     )}
                   </div>
-                  
+
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
                       <div className="text-sm font-medium text-slate-100">
-                        {file.name}
+                        {source.name}
                       </div>
-                      {getStatusBadge(file.status)}
+                      {getStatusBadge(
+                        source.status,
+                        source.total_files,
+                        source.processed_files
+                      )}
                     </div>
                     <div className="text-xs text-slate-400 mt-1">
-                      {file.path}
+                      {source.path}
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
-                      <span>{file.size}</span>
-                      <span>Modified {file.modified}</span>
+                      <span>{formatFileSize(source.total_files)}</span>
+                      {source.total_chunks > 0 && (
+                        <span>{source.total_chunks} chunks</span>
+                      )}
+                      <span>Added {formatTimeAgo(source.created_at)}</span>
                     </div>
                   </div>
                 </div>
@@ -176,10 +330,15 @@ export function FilesModule() {
                   <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
                     <Eye size={14} />
                   </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                    <Download size={14} />
-                  </Button>
-                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-400 hover:text-red-300">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8 w-8 p-0 text-red-400 hover:text-red-300"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(source.id);
+                    }}
+                  >
                     <Trash2 size={14} />
                   </Button>
                 </div>
@@ -187,42 +346,42 @@ export function FilesModule() {
             </div>
           ))}
 
-          {filteredFiles.length === 0 && (
+          {filteredSources.length === 0 && !isLoading && (
             <div className="text-center py-12">
               <div className="w-16 h-16 rounded-full bg-slate-700/50 flex items-center justify-center mx-auto mb-4">
                 <FileText size={24} className="text-slate-400" />
               </div>
-              <h3 className="text-lg font-medium text-slate-200 mb-2">No files found</h3>
+              <h3 className="text-lg font-medium text-slate-200 mb-2">
+                {sources.length === 0
+                  ? "No knowledge sources"
+                  : "No sources match your filters"}
+              </h3>
               <p className="text-slate-400 mb-4">
-                {searchQuery ? "Try adjusting your search query" : "Upload files to get started"}
+                {searchQuery || filterType !== "all"
+                  ? "Try adjusting your search or filters"
+                  : "Add files or folders to build your knowledge base"}
               </p>
-              <Button className="gap-2">
-                <Upload size={16} />
-                Upload Your First File
-              </Button>
+              {sources.length === 0 && (
+                <Button
+                  onClick={() => setShowUploadForm(true)}
+                  className="gap-2"
+                >
+                  <Upload size={16} />
+                  Add Your First Source
+                </Button>
+              )}
             </div>
           )}
-        </div>
-      </Card>
 
-      {/* Upload Zone */}
-      <Card className="p-6">
-        <div className="border-2 border-dashed border-white/20 rounded-lg p-8 text-center">
-          <Upload size={32} className="text-slate-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-slate-200 mb-2">Drag and Drop Files</h3>
-          <p className="text-slate-400 mb-4">
-            Support for .md, .txt, .pdf, .docx and many more formats
-          </p>
-          <div className="flex items-center justify-center gap-3">
-            <Button variant="secondary" className="gap-2">
-              <Upload size={16} />
-              Browse Files
-            </Button>
-            <Button variant="ghost" className="gap-2">
-              <Folder size={16} />
-              Select Folder
-            </Button>
-          </div>
+          {isLoading && sources.length === 0 && (
+            <div className="text-center py-12">
+              <RefreshCw
+                size={24}
+                className="text-slate-400 animate-spin mx-auto mb-4"
+              />
+              <p className="text-slate-400">Loading knowledge sources...</p>
+            </div>
+          )}
         </div>
       </Card>
     </div>

@@ -100,6 +100,91 @@ export async function testStreamingChat(
   }
 }
 
+// Knowledge Base Types
+export interface KnowledgeSource {
+  id: number;
+  name: string;
+  type: "file" | "folder";
+  path: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  total_files: number;
+  processed_files: number;
+  total_chunks: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IngestRequest {
+  path: string;
+  name?: string;
+}
+
+export interface IngestResponse {
+  message: string;
+  source_id: number;
+}
+
+/**
+ * Ingest a file or folder into the knowledge base
+ */
+export async function ingestKnowledge(path: string, name?: string): Promise<IngestResponse> {
+  try {
+    const request: IngestRequest = { path, name };
+    
+    const response = await fetch(`${BACKEND_URL}/api/v1/resource/ingest`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    throw new Error(formatApiError(error));
+  }
+}
+
+/**
+ * List all knowledge sources
+ */
+export async function listKnowledgeSources(): Promise<KnowledgeSource[]> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/v1/resource/list`);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data || [];
+  } catch (error) {
+    console.error("Failed to list knowledge sources:", error);
+    return [];
+  }
+}
+
+/**
+ * Delete a knowledge source
+ */
+export async function deleteKnowledgeSource(sourceId: number): Promise<void> {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/v1/resource/${sourceId}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+  } catch (error) {
+    throw new Error(formatApiError(error));
+  }
+}
+
 /**
  * Format error messages for user display
  */

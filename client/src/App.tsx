@@ -37,7 +37,7 @@ function App() {
   const renderActiveModule = () => {
     switch (activeModule) {
       case "chat":
-        return null; // Chat is handled separately
+        return null;
       case "memory":
         return <MemoryModule />;
       case "files":
@@ -71,25 +71,24 @@ function App() {
         onModelSelect={chatState.setSelectedModel}
       />
 
-      {/* Right Panel Toggle Button */}
+      {/* Right Panel Toggle Button - Only show on chat page */}
       <button
         onClick={toggleRightPanel}
-        className={`fixed top-4 z-40 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-500 active:scale-95 group ${
+        style={{ display: activeModule === "chat" ? "flex" : "none" }}
+        className={`fixed top-4 z-40 w-12 h-12 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-500 active:scale-95 group items-center justify-center ${
           isRightPanelVisible ? "bg-white/10 right-[20.5rem]" : "right-4"
         }`}
         title={isRightPanelVisible ? "Hide panels" : "Show panels"}
       >
-        <div className="flex items-center justify-center">
-          <div
-            className={`transition-transform duration-300 ${
-              isRightPanelVisible ? "rotate-180" : ""
-            }`}
-          >
-            <ChevronLeft
-              size={16}
-              className="text-slate-300 group-hover:text-slate-100"
-            />
-          </div>
+        <div
+          className={`transition-transform duration-300 ${
+            isRightPanelVisible ? "rotate-180" : ""
+          }`}
+        >
+          <ChevronLeft
+            size={16}
+            className="text-slate-300 group-hover:text-slate-100"
+          />
         </div>
       </button>
 
@@ -133,9 +132,7 @@ function App() {
         ) : (
           // Module layout
           <section className="flex-1 flex">
-            <div className="flex-1 ml-20 mr-4">
-              {renderActiveModule()}
-            </div>
+            <div className="flex-1 ml-20 mr-4">{renderActiveModule()}</div>
           </section>
         )}
       </main>

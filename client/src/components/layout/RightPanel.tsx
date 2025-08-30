@@ -1,6 +1,13 @@
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
-import { ChevronRight, ChevronDown, Cpu, Cloud, HardDrive, FileText } from "lucide-react";
+import {
+  ChevronRight,
+  ChevronDown,
+  Cpu,
+  Cloud,
+  HardDrive,
+  FileText,
+} from "lucide-react";
 
 interface Model {
   name: string;
@@ -60,8 +67,8 @@ export function RightPanel({
     <div
       className={`fixed z-20 right-4 top-4 bottom-4 pointer-events-none transition-all duration-500 ${
         isVisible
-          ? "opacity-100 translate-x-0"
-          : "opacity-0 translate-x-6 pointer-events-none"
+          ? "block translate-x-0"
+          : "hidden translate-x-6 pointer-events-none"
       }`}
     >
       <div className="relative h-full flex flex-col items-end gap-3">
@@ -115,18 +122,17 @@ export function RightPanel({
             <h3 className="text-sm tracking-tight text-slate-100">
               Knowledge Base
             </h3>
-            <Button 
-              size="sm" 
-              variant="secondary"
-              onClick={onAddReference}
-            >
+            <Button size="sm" variant="secondary" onClick={onAddReference}>
               Add Reference
             </Button>
           </div>
           <div className="space-y-2 max-h-32 overflow-y-auto">
             {knowledgeSources.length > 0 ? (
               knowledgeSources.map((source) => (
-                <div key={source.id} className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
+                <div
+                  key={source.id}
+                  className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10"
+                >
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-cyan-400/30 to-sky-500/20 border border-white/10 flex items-center justify-center">
                       <FileText size={12} className="text-cyan-300" />
@@ -141,10 +147,15 @@ export function RightPanel({
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <div className={`w-2 h-2 rounded-full ${
-                      source.status === "ready" ? "bg-green-400" : 
-                      source.status === "processing" ? "bg-yellow-400" : "bg-red-400"
-                    }`}></div>
+                    <div
+                      className={`w-2 h-2 rounded-full ${
+                        source.status === "ready"
+                          ? "bg-green-400"
+                          : source.status === "processing"
+                          ? "bg-yellow-400"
+                          : "bg-red-400"
+                      }`}
+                    ></div>
                   </div>
                 </div>
               ))
@@ -171,7 +182,7 @@ export function RightPanel({
                     </Button>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center justify-between rounded-2xl px-3 py-2 bg-white/5 border border-white/10">
                   <div className="flex items-center gap-2">
                     <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-purple-400/30 to-pink-500/20 border border-white/10 flex items-center justify-center">
@@ -194,7 +205,7 @@ export function RightPanel({
                 </div>
               </>
             )}
-            
+
             {/* Empty state when no references */}
             {knowledgeSources.length === 0 && (
               <div className="text-xs text-slate-400 text-center py-4 hidden">
