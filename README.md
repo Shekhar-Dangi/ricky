@@ -274,13 +274,14 @@ ricky/
 
 ## 🚧 Coming Next
 
+- � **Chat history** - Persistent conversation storage and retrieval
+- � **Reference system** - Use @ to reference specific files or past chats
+- ✍️ **Auto journaling** - Generate daily notes/summaries based on conversations
+- ⚡ **Task execution** - Run local scripts and commands through chat
+- � **Offline tasks** - Local reminders and task management
+- � **Smart notifications** - Context-aware alerts and updates
 - 📁 **More file formats** (PDF, DOCX, code files)
-- 🔍 **Advanced search filters** and faceted search
-- 📱 **Mobile-responsive** improvements
-- 🗣️ **Voice input/output** capabilities
-- 🔗 **External integrations** (Google Calendar, Gmail)
-- 🧠 **Persistent memory** system
-- ⚡ **Performance optimizations** for large knowledge bases
+- 🧠 **Conversation memory** - Reference past discussions in new chats
 
 ## 📄 License
 
