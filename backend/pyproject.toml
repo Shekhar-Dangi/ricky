@@ -1,0 +1,26 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "httpx",
+  "python-multipart",
+  "pydantic",
+  "langchain-ollama",
+  "langchain-core",
+  "google-auth",
+  "google-auth-oauthlib",
+  "google-auth-httplib2",
+  "google-api-python-client",
+  "google-genai",
+  "python-dotenv",
+  "sqlmodel>=0.0.24",
+  "chromadb>=1.0.20",
+  "sentence-transformers>=5.1.0",
+  "pathlib>=1.0.1",
+  "aiofiles>=24.1.0",
+]
