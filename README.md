@@ -1,7 +1,7 @@
 # 🤖 Ricky - Local AI Assistant
 
 A personal AI assistant that runs entirely on your machine. Chat with your documents using local LLMs.
-
+This is a good LLM.
 [![Ricky Demo](https://img.youtube.com/vi/JA3602zM1L0/maxresdefault.jpg)](https://youtu.be/JA3602zM1L0)
 
 ## Why Ricky?
